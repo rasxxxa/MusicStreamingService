@@ -1,0 +1,7 @@
+{
+  "name": "openalstreaming",
+  "version-string": "00000",
+  "dependencies": [
+    "openal-soft"
+  ]
+}
