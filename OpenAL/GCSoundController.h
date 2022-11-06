@@ -4,12 +4,14 @@
 #include "AL/alc.h"
 #include "AL/alext.h"
 #include <mutex>
+#include <deque>
 #include <functional>
 #include "SoundFile.h"
 
 using uint = unsigned int;
 using ulong = unsigned long;
 using uchar = unsigned char;
+
 
 struct SoundInfo
 {
@@ -52,6 +54,12 @@ public:
 
   virtual void FullStopBuffer(const SoundInfo& info) = 0;
 
+  virtual void CreateBuffer(ALuint& buffer) = 0;
+
+  virtual void QueueAndPlayData(const std::vector<char>& data, const WAVEFORMATEX& waveFormat, ALuint buffer, const ALuint source) = 0;
+
+  virtual void CreateSource(SoundInfo& info) = 0;
+
   enum class StatusChange : uint8_t { Paused, Stopped };
 
   using SoundStatusChangeCallback = std::function<void (uint object, StatusChange status)>;
@@ -82,6 +90,8 @@ public:
 
   bool IsSourcePlaying(const SoundInfo& soundInfo) const override;
 
+  virtual void CreateSource(SoundInfo& info) override;
+
   bool IsSoundDataLooping(const SoundInfo& soundInfo) const override;
 
   void BreakLoop(const SoundInfo& soundInfo) override;
@@ -90,7 +100,11 @@ public:
 
   void FullStopBuffer(const SoundInfo& info) override;
   
+  void CreateBuffer(ALuint& buffer) override;
+  
   void CreateNewSourceAndBuffer(const SoundFile& soundFile, SoundInfo& soundInfo) override;
+
+  virtual void QueueAndPlayData(const std::vector<char>& data, const WAVEFORMATEX& waveFormat, ALuint buffer, const ALuint source) override;
 
   void CreateSourceForExistingBuffer(SoundInfo& soundInfo) override;
 
@@ -117,6 +131,8 @@ private:
   ALCdevice* m_alcDevice;
   ALCcontext* m_alcContext;
   std::unordered_map<ALuint, std::unordered_map<ALuint, SoundInfo>> m_bufferWithSources;
+
+
 
   void CreateBuffer(ALuint& alBuffer, SoundInfo& soundInfo);
 

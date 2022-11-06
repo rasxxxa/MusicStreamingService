@@ -355,6 +355,13 @@ bool CSoundController::IsSourcePlaying(const SoundInfo& soundInfo) const
 
 
 
+void CSoundController::CreateSource(SoundInfo& info)
+{
+    alGenSources(1, &info.source);
+}
+
+
+
 void CSoundController::SetSourceVolume(const SoundInfo& soundInfo, const ALfloat alfVolume)
 {
   if (!m_initialized)
@@ -437,6 +444,11 @@ void CSoundController::FullStopBuffer(const SoundInfo& info)
 
 }
 
+void CSoundController::CreateBuffer(ALuint& buffer)
+{
+    alGenBuffers(1, &buffer);
+}
+
 
 
 void CSoundController::CreateNewSourceAndBuffer(const SoundFile& soundFile, SoundInfo& soundInfo)
@@ -469,7 +481,6 @@ void CSoundController::CreateNewSourceAndBuffer(const SoundFile& soundFile, Soun
   if (LogIfOpenALError("Could not bind buffer with data", soundInfo))
   {
     soundInfo.buffer = soundInfo.source = 0;
-    //ASSERT(false);
     return;
   }
 
@@ -506,4 +517,36 @@ void CSoundController::CreateSourceForExistingBuffer(SoundInfo& soundInfo)
       }
     }
   }
+}
+
+void CSoundController::QueueAndPlayData(const std::vector<char>& data, const WAVEFORMATEX& waveFormat, ALuint buffer, const ALuint source)
+{
+    ALint state;
+    alGetSourcei(source, AL_SOURCE_STATE, &state);
+    static bool startedPlaying = false;
+
+    if (startedPlaying)
+    {
+        alSourceUnqueueBuffers(source, 1, &buffer);
+    }
+    startedPlaying = true;
+    ALenum alDefaultFormat = 0;
+
+    if (waveFormat.nChannels == 1 && waveFormat.wBitsPerSample == 8)
+        alDefaultFormat = AL_FORMAT_MONO8;
+    else if (waveFormat.nChannels == 1 && waveFormat.wBitsPerSample == 16)
+        alDefaultFormat = AL_FORMAT_MONO16;
+    else if (waveFormat.nChannels == 2 && waveFormat.wBitsPerSample == 8)
+        alDefaultFormat = AL_FORMAT_STEREO8;
+    else if (waveFormat.nChannels == 2 && waveFormat.wBitsPerSample == 16)
+        alDefaultFormat = AL_FORMAT_STEREO16;
+    else if (waveFormat.nChannels == 1 && waveFormat.wBitsPerSample == 32)
+        alDefaultFormat = AL_FORMAT_MONO_FLOAT32;
+    else if (waveFormat.nChannels == 2 && waveFormat.wBitsPerSample == 32)
+        alDefaultFormat = AL_FORMAT_STEREO_FLOAT32;
+
+    
+    alBufferData(buffer, alDefaultFormat, data.data(), data.size(), waveFormat.nSamplesPerSec);
+    alSourceQueueBuffers(source, 1, &buffer);
+    alSourcePlay(source);
 }

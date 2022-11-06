@@ -153,11 +153,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="GCSoundController.cpp" />
+    <ClCompile Include="Sound.cpp" />
     <ClCompile Include="SoundFile.cpp" />
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GCSoundController.h" />
+    <ClInclude Include="Sound.h" />
     <ClInclude Include="SoundFile.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
