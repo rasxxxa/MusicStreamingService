@@ -70,6 +70,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="Vcpkg">
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -143,6 +146,9 @@
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OpenAL\OpenALTesting.vcxproj">
+      <Project>{677cf9df-1ec7-45c4-b7d0-28bfbcd39e7a}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\SocketsClientServer\SocketsClientServer.vcxproj">
       <Project>{3dacfa9f-66ed-432f-b667-9afdee812793}</Project>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>

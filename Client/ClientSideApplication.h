@@ -4,6 +4,7 @@
 #include <vector>
 #include <mutex>
 #include <thread>
+#include "../OpenAL/Sound.h"
 #include <WS2tcpip.h>
 #include <WinSock2.h>
 #include <functional>

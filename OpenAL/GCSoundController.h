@@ -1,8 +1,8 @@
 #pragma once
 
-#include "AL/al.h"
-#include "AL/alc.h"
-#include "AL/alext.h"
+#include "../include/AL/al.h"
+#include "../include/AL/alc.h"
+#include "../include/AL/alext.h"
 #include <mutex>
 #include <deque>
 #include <functional>
@@ -54,11 +54,13 @@ public:
 
   virtual void FullStopBuffer(const SoundInfo& info) = 0;
 
-  virtual void CreateBuffer(ALuint& buffer) = 0;
+  virtual void CreateBuffer(ALuint& source, ALuint& buffer) = 0;
 
-  virtual void QueueAndPlayData(const std::vector<char>& data, const WAVEFORMATEX& waveFormat, ALuint buffer, const ALuint source) = 0;
+  virtual void QueueAndPlayData(void * data, long size, const MYWAVEFORMATEX& waveFormat, ALuint buffer, const ALuint source, bool unqueue) = 0;
 
   virtual void CreateSource(SoundInfo& info) = 0;
+
+  virtual void PlaySource(ALuint source) = 0;
 
   enum class StatusChange : uint8_t { Paused, Stopped };
 
@@ -100,13 +102,15 @@ public:
 
   void FullStopBuffer(const SoundInfo& info) override;
   
-  void CreateBuffer(ALuint& buffer) override;
+  void CreateBuffer(ALuint& source, ALuint& buffer) override;
   
   void CreateNewSourceAndBuffer(const SoundFile& soundFile, SoundInfo& soundInfo) override;
 
-  virtual void QueueAndPlayData(const std::vector<char>& data, const WAVEFORMATEX& waveFormat, ALuint buffer, const ALuint source) override;
+  virtual void QueueAndPlayData(void* data, long size, const MYWAVEFORMATEX& waveFormat, ALuint buffer, const ALuint source, bool unqueue) override;
 
   void CreateSourceForExistingBuffer(SoundInfo& soundInfo) override;
+
+  void PlaySource(ALuint source) override;
 
   static void AL_APIENTRY EventCallBack(ALenum eventType, ALuint object, ALuint param,
     ALsizei length, const ALchar* message,
@@ -130,9 +134,12 @@ private:
   std::atomic_bool m_initialized;
   ALCdevice* m_alcDevice;
   ALCcontext* m_alcContext;
+  std::thread m_unqueuer;
+  std::recursive_mutex streamingLock;
   std::unordered_map<ALuint, std::unordered_map<ALuint, SoundInfo>> m_bufferWithSources;
 
-
+  static std::unordered_map<ALuint, bool> m_shouldUnqueue;
+  std::unordered_map<ALuint, std::pair<ALuint, ALuint>> m_buffersWithSources;
 
   void CreateBuffer(ALuint& alBuffer, SoundInfo& soundInfo);
 
@@ -141,4 +148,6 @@ private:
   void CreateSource(ALuint& alSource, SoundInfo& soundInfo);
 
   bool LogIfOpenALError(const char* message, const SoundInfo& soundInfo) const;
+
+  int UnqueueBuffer(const ALuint& source);
 };

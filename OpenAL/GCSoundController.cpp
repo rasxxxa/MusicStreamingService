@@ -1,5 +1,5 @@
 #include "GCSoundController.h"
-
+#include <iostream>
 #pragma comment(lib, "../lib/OpenAL32.lib")
 
 #ifdef _MHD_UNIT_TESTS
@@ -7,6 +7,7 @@ std::unique_ptr<ISoundController> CSoundController::g_testingInstance = nullptr;
 #endif
 std::recursive_mutex CSoundController::csSoundLock;
 ISoundController::SoundStatusChangeCallback CSoundController::m_statusChangeCallback;
+std::unordered_map<ALuint, bool> CSoundController::m_shouldUnqueue;
 
 constexpr const char* GetErrorMessage(const uint& error)
 {
@@ -54,7 +55,7 @@ CSoundController::CSoundController() : m_alcDevice(nullptr), m_alcContext(nullpt
     alcCloseDevice(m_alcDevice);
     return;
   }
-
+  RegisterSoundStatusChangeCallback(nullptr);
   m_initialized = true;
 }
 
@@ -80,6 +81,7 @@ CSoundController::~CSoundController()
   alcMakeContextCurrent(nullptr);
   alcDestroyContext(m_alcContext);
   alcCloseDevice(m_alcDevice);
+  m_initialized = false;
 }
 
 void CSoundController::RegisterSoundStatusChangeCallback(SoundStatusChangeCallback callback)
@@ -109,6 +111,21 @@ void AL_APIENTRY CSoundController::EventCallBack(ALenum eventType, ALuint object
     std::lock_guard lock(csSoundLock);
     callback = m_statusChangeCallback;
   }
+
+  ALint unqueueBuffer = 0;
+  alGetSourcei(object, AL_BUFFERS_PROCESSED, &unqueueBuffer);
+  if (unqueueBuffer > 0)
+  {
+      while (unqueueBuffer > 0)
+      {
+          ALuint bufferUnqueued;
+          alSourceUnqueueBuffers(object, 1, &bufferUnqueued);
+          m_shouldUnqueue[bufferUnqueued] = false;
+          unqueueBuffer--;
+      }
+  }
+
+  alSourcePlay(object);
 
   if (!callback)
     return;
@@ -184,6 +201,25 @@ void CSoundController::DeleteBuffer(const SoundInfo& soundInfo, bool deleteFromL
 
 
 
+int CSoundController::UnqueueBuffer(const ALuint& source)
+{
+    int returnResult = 0;
+    ALint unqueueBuffer = 0;
+    alGetSourcei(source, AL_BUFFERS_PROCESSED, &unqueueBuffer);
+    if (unqueueBuffer > 0)
+    {
+        while (unqueueBuffer > 0)
+        {
+            ALuint bufferUnqueued;
+            alSourceUnqueueBuffers(source, 1, &bufferUnqueued);
+            m_shouldUnqueue[bufferUnqueued] = false;
+            returnResult = bufferUnqueued;
+            unqueueBuffer--;
+        }
+    }
+    return returnResult;
+}
+
 void CSoundController::CreateBuffer(ALuint& alBuffer, SoundInfo& soundInfo)
 {
   if (!m_initialized)
@@ -239,7 +275,8 @@ bool CSoundController::LogIfOpenALError(const char* message, const SoundInfo& so
   uint error = 0; 
   if (GetALError(error))
   {
-    std::string soundFullPath = soundInfo.soundPath + "\\" + soundInfo.soundName;
+      std::string soundFullPath = soundInfo.soundPath + "\\" + soundInfo.soundName;
+      std::cout << GetErrorMessage(error) << " " << soundFullPath << std::endl;
     //TRACEE("ERROR: %s, CAUSE OF ASSERTION: %s, SOUND: %s", message, GetErrorMessage(error), soundFullPath.c_str());
     return true;
   }
@@ -347,10 +384,10 @@ bool CSoundController::IsSourcePlaying(const SoundInfo& soundInfo) const
       return false;
     }
 
-    if (!(state == AL_PLAYING))
-      return false;
+    if ((state == AL_PLAYING))
+      return true;
   }
-  return true;
+  return false;
 }
 
 
@@ -444,9 +481,12 @@ void CSoundController::FullStopBuffer(const SoundInfo& info)
 
 }
 
-void CSoundController::CreateBuffer(ALuint& buffer)
+void CSoundController::CreateBuffer(ALuint& source, ALuint& buffer)
 {
     alGenBuffers(1, &buffer);
+    m_buffersWithSources[buffer] = std::pair<ALuint, ALuint>(source, buffer);
+    m_shouldUnqueue[buffer] = false;
+
 }
 
 
@@ -458,7 +498,7 @@ void CSoundController::CreateNewSourceAndBuffer(const SoundFile& soundFile, Soun
 
   ALenum alDefaultFormat = 0;
 
-  WAVEFORMATEX waveFormat=soundFile.GetWaveFormat();
+  MYWAVEFORMATEX waveFormat=soundFile.GetWaveFormat();
   const std::vector<uchar> &vecSoundData=soundFile.GetSoundData();
 
   if (waveFormat.nChannels == 1 && waveFormat.wBitsPerSample == 8)
@@ -519,17 +559,17 @@ void CSoundController::CreateSourceForExistingBuffer(SoundInfo& soundInfo)
   }
 }
 
-void CSoundController::QueueAndPlayData(const std::vector<char>& data, const WAVEFORMATEX& waveFormat, ALuint buffer, const ALuint source)
+void CSoundController::PlaySource(ALuint source)
 {
-    ALint state;
-    alGetSourcei(source, AL_SOURCE_STATE, &state);
-    static bool startedPlaying = false;
+    if (alIsSource(source))
+        alSourcePlay(source);
+}
 
-    if (startedPlaying)
-    {
-        alSourceUnqueueBuffers(source, 1, &buffer);
-    }
-    startedPlaying = true;
+
+
+void CSoundController::QueueAndPlayData(void* data, long size, const MYWAVEFORMATEX& waveFormat, ALuint buffer, const ALuint source, bool unqueue)
+{
+
     ALenum alDefaultFormat = 0;
 
     if (waveFormat.nChannels == 1 && waveFormat.wBitsPerSample == 8)
@@ -545,8 +585,37 @@ void CSoundController::QueueAndPlayData(const std::vector<char>& data, const WAV
     else if (waveFormat.nChannels == 2 && waveFormat.wBitsPerSample == 32)
         alDefaultFormat = AL_FORMAT_STEREO_FLOAT32;
 
-    
-    alBufferData(buffer, alDefaultFormat, data.data(), data.size(), waveFormat.nSamplesPerSec);
-    alSourceQueueBuffers(source, 1, &buffer);
-    alSourcePlay(source);
+
+
+    ALuint unqueued = 0;
+    if (buffer == 255)
+    {
+        ALuint unqueued2 = UnqueueBuffer(source);
+        m_shouldUnqueue[unqueued2] = true;
+        alBufferData(unqueued2, alDefaultFormat, data, size, waveFormat.nSamplesPerSec);
+        alSourceQueueBuffers(source, 1, &unqueued2);
+        std::cout << "QUEUED BUFFER AFTER UNQEUEING" << unqueued2 << std::endl;
+    }
+    else
+    {
+        for (const auto& val : m_shouldUnqueue)
+        {
+            if (val.second == false)
+            {
+                unqueued = val.first;
+                m_shouldUnqueue[unqueued] = true;
+                alBufferData(unqueued, alDefaultFormat, data, size, waveFormat.nSamplesPerSec);
+                std::cout << "QUEUED BUFFER" << unqueued << std::endl;
+                alSourceQueueBuffers(source, 1, &unqueued);
+                break;
+            }
+        }
+    }
+
+    static bool start = false;
+    if (!start)
+    {
+        start = true;
+        alSourcePlay(source);
+    }
 }

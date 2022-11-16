@@ -21,12 +21,12 @@ int SocketCreator::Send(SOCKET socket, const void const* object, int objectSize)
 
 
 
-int SocketCreator::Receive(SOCKET socket, const std::function<void(void*, int bytesReceived)>& handleObject)
+int SocketCreator::Receive(SOCKET socket, int additionalBytes, const std::function<void(void*, int bytesReceived)>& handleObject)
 {
-	void* objectReceived = (void*)malloc(MAX_BUFFER_SIZE);
+	char* objectReceived = (char*)malloc(MAX_BUFFER_SIZE + additionalBytes);
 	int result = -1;
 	if (objectReceived != nullptr)
-	    result = recv(socket, (char*)objectReceived, MAX_BUFFER_SIZE, 0);
+	    result = recv(socket, objectReceived, MAX_BUFFER_SIZE + additionalBytes, 0);
 	
 	if (result >= 0)
 		handleObject(objectReceived, result);

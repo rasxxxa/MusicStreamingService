@@ -25,7 +25,7 @@ typedef struct tWAVEFORMATEX
     WORD        wBitsPerSample;     /* number of bits per sample of mono data */
     WORD        cbSize;             /* the count in bytes of the size of */
                                     /* extra information (after cbSize) */
-} WAVEFORMATEX;
+} MYWAVEFORMATEX;
 #endif // _WAVEFORMATEX_
 
 #pragma pack()
@@ -85,7 +85,7 @@ public:
             ulong aulChunk[2];
             aulChunk[0] = *(ulong*)(((uchar*)aucHeader) + 3 * sizeof(DWORD));
             aulChunk[1] = *(ulong*)(((uchar*)aucHeader) + 4 * sizeof(DWORD));
-            const ulong ulSizePcmWaveFormat = sizeof(WAVEFORMATEX) - sizeof(m_waveFormat.cbSize);
+            const ulong ulSizePcmWaveFormat = sizeof(MYWAVEFORMATEX) - sizeof(m_waveFormat.cbSize);
             while (!(aulChunk[0] == mmioFOURCC('f', 'm', 't', ' ') && aulChunk[1] >= ulSizePcmWaveFormat))
             {
                 file.Seek(aulChunk[1], CFile::current);
@@ -137,7 +137,7 @@ public:
     }
 
     //-- Returns wave format (DirectSound buffer needs this structure).
-    WAVEFORMATEX GetWaveFormat() const
+    MYWAVEFORMATEX GetWaveFormat() const
     {
         return m_waveFormat;
     }
@@ -149,6 +149,6 @@ public:
     }
 
 private:
-    WAVEFORMATEX m_waveFormat;
+    MYWAVEFORMATEX m_waveFormat;
     std::vector<uchar> m_vecData;
 };
