@@ -32,9 +32,9 @@ void ServerSideApplication::ListenForSockets()
 
 void ServerSideApplication::ListenForMessages(SOCKET& socket)
 {
-	while (true && m_runningSockets[socket])
+	while (m_runningSockets[socket])
 	{
-		int result = Receive(socket,0, [](void* object, int size) {
+		    Receive(socket,0, [](void* object, int size) {
 			
 			char* message = (char*)object;
 			if (message != nullptr)
